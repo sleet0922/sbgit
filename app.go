@@ -90,6 +90,7 @@ type AppState struct {
 
 	Notification string
 	NotifType    int
+	NotifTicks   int
 
 	ThemeIdx int
 }
@@ -189,6 +190,7 @@ func (a *App) resetPageState(page PageID) {
 func (a *App) notify(msg string, notifType int) {
 	a.state.Notification = msg
 	a.state.NotifType = notifType
+	a.state.NotifTicks = 8
 }
 
 func (a *App) showDialog(dt DialogType, title, message string, buttons []string) {
@@ -248,6 +250,12 @@ func (a *App) closeDialog() {
 }
 
 func (a *App) handleKey(key Key) {
+	if a.state.NotifTicks > 0 {
+		a.state.NotifTicks--
+		if a.state.NotifTicks == 0 {
+			a.state.Notification = ""
+		}
+	}
 	if a.state.Dialog.Type != DialogNone {
 		a.handleDialogKey(key)
 		return
@@ -582,6 +590,13 @@ func (a *App) handleStatusAction() {
 			}
 		case 1:
 			a.pushPage(PageDiff)
+		case 2:
+			err := a.git.AddToGitignore(file.Path)
+			if err != nil {
+				a.showInfo(L("error.git"), err.Error())
+			} else {
+				a.notify("✅ "+L("action.gitignore")+" "+file.Path, 0)
+			}
 		}
 	})
 }
@@ -645,6 +660,8 @@ func (a *App) handleCommitKey(key Key) {
 			a.state.CommitInputActive = true
 		case 'c':
 			a.doCommit()
+		case 'A':
+			a.doAmendCommit()
 		case 'a':
 			a.git.StageAll()
 			a.notify("✅ "+L("commit.stage.all"), 0)
@@ -699,6 +716,25 @@ func (a *App) doCommit() {
 			a.state.CommitMessage = ""
 			a.state.CommitMsgCursor = 0
 			a.notify(L("commit.success"), 0)
+		}
+	})
+}
+
+func (a *App) doAmendCommit() {
+	msg := strings.TrimSpace(a.state.CommitMessage)
+	a.showConfirm(L("commit.amend.confirm"), L("commit.amend.confirm"), func() {
+		var err error
+		if msg != "" {
+			err = a.git.AmendCommit(msg)
+		} else {
+			err = a.git.AmendCommit("")
+		}
+		if err != nil {
+			a.showInfo(L("error.git"), err.Error())
+		} else {
+			a.state.CommitMessage = ""
+			a.state.CommitMsgCursor = 0
+			a.notify("✅ "+L("commit.amend")+" "+L("commit.success"), 0)
 		}
 	})
 }
@@ -1481,55 +1517,76 @@ func (a *App) renderStatusBar(r Rect) {
 	switch page {
 	case PageMain:
 		sections = []string{
-			"↑↓ Nav",
-			"Enter OK",
-			"1-8 Select",
-			"q Quit",
+			L("statusbar.nav"),
+			L("statusbar.ok"),
+			L("statusbar.select"),
+			L("statusbar.quit"),
 		}
 	case PageStatus:
 		tabs := []string{L("status.staged"), L("status.unstaged"), L("status.untracked")}
 		sections = []string{
-			"Tab Switch",
+			L("statusbar.tab"),
 			tabs[a.state.StatusTab],
-			"Enter OK",
-			"Esc Back",
+			L("statusbar.ok"),
+			L("statusbar.back"),
 		}
 	case PageCommit:
 		tabs := []string{L("status.staged"), L("status.unstaged"), L("status.untracked")}
 		sections = []string{
-			"Tab Switch",
+			L("statusbar.tab"),
 			tabs[a.state.CommitTab],
-			"e Edit c Commit s Stage/u",
+			L("statusbar.edit"),
+			L("statusbar.commit"),
+			L("statusbar.stage"),
+			L("statusbar.stageall"),
+			L("statusbar.unstageall"),
+			L("statusbar.amend"),
 		}
 	case PageBranch:
 		tabs := []string{L("branch.local"), L("branch.remote")}
 		sections = []string{
-			"Tab Switch",
+			L("statusbar.tab"),
 			tabs[a.state.BranchTab],
-			"n New s Switch d Del m Merge",
+			L("statusbar.new"),
+			L("statusbar.switch"),
+			L("statusbar.delete"),
+			L("statusbar.merge"),
+			L("statusbar.rebase"),
 		}
 	case PageLog:
 		sections = []string{
-			"d Detail / Search Enter OK PgUp/Dn",
+			L("statusbar.detail"),
+			L("statusbar.search"),
+			L("statusbar.ok"),
+			L("statusbar.pgupdn"),
 		}
 	case PageStash:
 		sections = []string{
-			"s Save p Pop a Apply d Drop c Clear",
+			L("statusbar.save"),
+			L("statusbar.pop"),
+			L("statusbar.apply"),
+			L("statusbar.drop"),
+			L("statusbar.clear"),
 		}
 	case PageDiff:
 		tabs := []string{L("diff.staged"), L("diff.unstaged")}
 		sections = []string{
-			"Tab Switch",
+			L("statusbar.tab"),
 			tabs[a.state.DiffTab],
-			"↑↓ Scroll PgUp/Dn",
+			L("statusbar.scroll"),
+			L("statusbar.pgupdn"),
 		}
 	case PageRemote:
 		sections = []string{
-			"f Fetch p Pull u Push Enter OK",
+			L("statusbar.fetch"),
+			L("statusbar.pull"),
+			L("statusbar.push"),
+			L("statusbar.ok"),
 		}
 	case PageSettings:
 		sections = []string{
-			"Enter Edit Esc Back",
+			L("statusbar.ok"),
+			L("statusbar.back"),
 		}
 	}
 

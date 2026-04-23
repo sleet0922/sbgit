@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -19,7 +20,14 @@ func (g *Git) run(args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = g.workDir
 	out, err := cmd.CombinedOutput()
-	return strings.TrimRight(string(out), "\r\n"), err
+	result := strings.TrimRight(string(out), "\r\n")
+	if err != nil {
+		if result != "" {
+			return result, fmt.Errorf("%s", result)
+		}
+		return result, err
+	}
+	return result, nil
 }
 
 func (g *Git) IsRepo() bool {
@@ -157,7 +165,11 @@ func (g *Git) Commit(message string) error {
 }
 
 func (g *Git) AmendCommit(message string) error {
-	_, err := g.run("commit", "--amend", "-m", message)
+	if message != "" {
+		_, err := g.run("commit", "--amend", "-m", message)
+		return err
+	}
+	_, err := g.run("commit", "--amend", "--no-edit")
 	return err
 }
 
@@ -496,5 +508,16 @@ func (g *Git) AddRemote(name, url string) error {
 
 func (g *Git) RemoveRemote(name string) error {
 	_, err := g.run("remote", "remove", name)
+	return err
+}
+
+func (g *Git) AddToGitignore(path string) error {
+	gitignorePath := g.workDir + string(os.PathSeparator) + ".gitignore"
+	f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString("\n" + path + "\n")
 	return err
 }
