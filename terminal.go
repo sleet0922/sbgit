@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 
-	"golang.org/x/sys/windows"
 	"golang.org/x/term"
 )
 
@@ -302,16 +301,7 @@ func parseKey(buf []byte) Key {
 }
 
 func EnableANSI() {
-	var mode uint32
-	stdout := windows.Handle(os.Stdout.Fd())
-	windows.GetConsoleMode(stdout, &mode)
-	mode |= 0x0004
-	windows.SetConsoleMode(stdout, mode)
-
-	stdin := windows.Handle(os.Stdin.Fd())
-	windows.GetConsoleMode(stdin, &mode)
-	mode |= 0x0200
-	windows.SetConsoleMode(stdin, mode)
+	// Linux/macOS 默认支持 ANSI，无需额外设置
 }
 
 func itoa(n int) string {
